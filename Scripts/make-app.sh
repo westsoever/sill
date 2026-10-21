@@ -19,9 +19,11 @@
 #
 # Grants survive rebuilds only with a real identity: its designated requirement names the bundle ID
 # and the certificate, not this binary. Ad hoc ("-") is a hash of this exact build, so every
-# rebuild would silently lose Screen Recording and Accessibility.
+# rebuild would silently lose Screen Recording and Accessibility. --install resets Sill's grants
+# itself when the copy it replaces has another designated requirement (Scripts/lib-grants.sh).
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. Scripts/lib-grants.sh
 
 install=0; open_app=0; release=0
 for arg in "$@"; do
@@ -337,8 +339,18 @@ if [ "$install" = 1 ]; then
         pkill -TERM -f 'Sill\.app/Contents/MacOS/Sill' || true
         for _ in $(seq 1 50); do pgrep -f 'Sill\.app/Contents/MacOS/Sill' >/dev/null || break; sleep 0.1; done
     fi
+    # The copy being replaced: if its designated requirement differs from this build's (another
+    # identity, an expired certificate, ad hoc), macOS keeps its grants for that one and denies
+    # this one while System Settings shows the switches on. Reset them so macOS asks afresh.
+    replaced=0; old_requirement=""
+    if [ -e "$dest" ]; then replaced=1; old_requirement="$(designated_requirement "$dest")"; fi
     rm -rf "$dest"
     ditto "$app" "$dest"
+    if [ "$replaced" = 1 ] && reset_stale_grants "$bundle_id" "$old_requirement" "$(designated_requirement "$dest")" ScreenCapture Accessibility; then
+        # Sill shows each system alert once and remembers it did; the reset removed the rows.
+        defaults delete "$bundle_id" askedScreenRecording 2>/dev/null || true
+        defaults delete "$bundle_id" askedAccessibility 2>/dev/null || true
+    fi
     # One registered Sill: LaunchServices (the login item, `open -b`, Spotlight) must not pick the
     # copy in .build.
     /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u "$PWD/$app" 2>/dev/null || true
