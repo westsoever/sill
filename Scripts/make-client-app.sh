@@ -58,11 +58,22 @@ fi
 ids="$(security find-identity -v -p codesigning 2>/dev/null || true)"
 identity="${SILL_SIGN_IDENTITY:-$(echo "$ids" | awk '/"Developer ID Application: / { print $2; exit }')}"
 [ -n "$identity" ] || identity="$(echo "$ids" | awk '/"Apple Development: / { print $2; exit }')"
-[ -n "$identity" ] || { identity="-"; echo "warning: no signing identity; signing ad hoc" >&2; }
+# Then Scripts/make-local-identity.sh's self-signed one (not trusted, so not listed by -v): this
+# Mac's grants and keychain items survive rebuilds with it, but no other Mac's Gatekeeper takes it.
+local_id=0
+if [ -z "$identity" ]; then
+    identity="$(security find-identity -p codesigning 2>/dev/null | awk '/"Sill Local Signing"/ { print $2; exit }' || true)"
+    [ -n "$identity" ] && local_id=1
+fi
+[ -n "$identity" ] || { identity="-"; echo "warning: no signing identity; signing ad hoc (Scripts/make-local-identity.sh makes one that keeps the grants)" >&2; }
 # The helper first (a nested bundle is sealed into its parent's signature), then the app.
 if [ "$identity" = "-" ]; then
     codesign --force --options runtime --timestamp=none --sign - "$helper"
     codesign --force --options runtime --timestamp=none --sign - "$app"
+elif [ "$local_id" = 1 ]; then
+    [ "$notarize" = 0 ] || { echo "error: --notarize needs a Developer ID identity, not Sill Local Signing" >&2; exit 1; }
+    codesign --force --options runtime --timestamp=none --sign "$identity" "$helper"
+    codesign --force --options runtime --timestamp=none --sign "$identity" "$app"
 else
     codesign --force --options runtime --timestamp --sign "$identity" "$helper"
     codesign --force --options runtime --timestamp --sign "$identity" "$app"

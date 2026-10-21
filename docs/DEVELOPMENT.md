@@ -60,9 +60,17 @@ running Sill (its streamed window goes home first), replaces
 Without `--install` it only builds `.build/Sill.app`. It will not replace an
 `/Applications/Sill.app` that is not this app (an iPad build of the client, say).
 `SILL_INSTALL_DIR=~/Applications Scripts/make-app.sh --install` installs it in
-another folder. With no Apple Development identity in the keychain it signs ad
-hoc and says so, and then Screen Recording and Accessibility have to be granted
-again after every rebuild (see Permissions).
+another folder. With no Apple Development identity in the keychain it signs with
+"Sill Local Signing" when `Scripts/make-local-identity.sh` has made it (a
+self-signed certificate in the login keychain, for a Mac with no Apple developer
+account; `make-client-app.sh` takes it too), else ad hoc, and says so. Ad hoc,
+Screen Recording and Accessibility have to be granted again after every rebuild
+(System Settings still shows the switch on, for the build before: remove the
+entry and add the app again; see Permissions), and the next build cannot read
+the remote identity this one made, so it makes a new one and every device pairs
+again. A build signed here also cannot read a Developer ID release's identity
+(the data-protection keychain), so replacing the downloaded Sill with one means
+pairing each device once more.
 
 `SILL_UNIVERSAL=1 Scripts/make-app.sh` builds a universal Sill.app, arm64 and
 x86_64, for someone testing on an Intel Mac (#62): one build per architecture,

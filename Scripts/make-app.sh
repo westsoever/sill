@@ -139,10 +139,16 @@ cp "$icon_out"/compiled/* "$stage/Contents/Resources/" 2>/dev/null || true
 # which a renewal keeps. (`|| true`: no keychain or no match must fall through to the ad hoc
 # warning below, not end the script under `set -e`.)
 identity="${SILL_SIGN_IDENTITY:-$(security find-identity -v -p codesigning 2>/dev/null | awk '/"Apple Development: / { print $2; exit }' || true)}"
+# Without an Apple identity, Scripts/make-local-identity.sh's self-signed one (not trusted, so not
+# listed by -v): its designated requirement survives rebuilds as Apple Development's does.
+if [ -z "$identity" ] && [ "$release" = 0 ]; then
+    identity="$(security find-identity -p codesigning 2>/dev/null | awk '/"Sill Local Signing"/ { print $2; exit }' || true)"
+fi
 if [ -z "$identity" ]; then
     identity="-"
     echo "warning: no Apple Development identity in the keychain; signing ad hoc. Screen Recording and" >&2
-    echo "         Accessibility will have to be granted again after every rebuild." >&2
+    echo "         Accessibility will have to be granted again after every rebuild, and the remote" >&2
+    echo "         identity made by one build is not readable by the next (Scripts/make-local-identity.sh)." >&2
 fi
 if [ "$release" = 1 ]; then
     # Developer ID: hardened runtime and a secure timestamp (notarization needs both), no get-task-allow.
