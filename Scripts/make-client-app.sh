@@ -12,6 +12,7 @@
 # from .build/Sill.app when Scripts/make-app.sh has built it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. Scripts/lib-grants.sh
 config=release; open_after=0; notarize=0
 for a in "$@"; do
     case "$a" in
@@ -24,6 +25,10 @@ done
 swift build -c "$config" --product SillClient
 swift build -c "$config" --product SillDockProxy
 app=".build/Sill Viewer.app"
+# The build being replaced: another designated requirement means macOS keeps its Accessibility grant
+# for that one and denies this one (Scripts/lib-grants.sh).
+replaced=0; old_requirement=""
+if [ -e "$app" ]; then replaced=1; old_requirement="$(designated_requirement "$app")"; fi
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp ".build/$config/SillClient" "$app/Contents/MacOS/SillClient"
@@ -80,6 +85,9 @@ else
 fi
 codesign --verify --strict "$app"
 echo "Signed by: $(codesign -dv --verbose=2 "$app" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
+if [ "$replaced" = 1 ] && reset_stale_grants me.saffer.sill.client "$old_requirement" "$(designated_requirement "$app")" Accessibility; then
+    echo "      A running Sill Viewer from before must be quit and opened again."
+fi
 if [ "$notarize" = 1 ]; then
     [ "$config" = release ] || { echo "error: --notarize is for the release build (a debug build carries test hooks)" >&2; exit 1; }
     profile="${SILL_NOTARY_PROFILE:-sill-notary}"

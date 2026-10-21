@@ -380,8 +380,16 @@ Scripts/make-client-app.sh --open          # .build/Sill Viewer.app (release; --
   login item. Running `Sill.app/Contents/MacOS/Sill` from Terminal makes
   Terminal the responsible process, with Terminal's permissions.
 - Grants survive rebuilds because every build is signed with the same
-  identity. If they ever go stale (the switch is on in System Settings but Sill
-  still can't capture or click): quit Sill, run `tccutil reset ScreenCapture
+  identity. When a build is signed another way than the copy it replaces (another
+  identity, an expired certificate, ad hoc), macOS keeps the grants for the old
+  one: the switches stay on in System Settings and the new build is denied.
+  `Scripts/make-app.sh --install` and `Scripts/make-client-app.sh` notice (the
+  two designated requirements differ), reset Sill's rows and the "asked" flags
+  below and say so (`Scripts/lib-grants.sh`); allow Screen Recording and
+  Accessibility once more in Settings › Permissions. A copy put in place any
+  other way (a downloaded release over a development build, a drag in Finder)
+  does not get that, so if the grants ever go stale (the switch is on in System
+  Settings but Sill still can't capture or click): quit Sill, run `tccutil reset ScreenCapture
   me.saffer.sill.mac` and `tccutil reset Accessibility me.saffer.sill.mac`,
   then `defaults delete me.saffer.sill.mac askedScreenRecording` and
   `defaults delete me.saffer.sill.mac askedAccessibility`, open Sill again and
